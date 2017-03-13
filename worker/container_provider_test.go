@@ -96,6 +96,7 @@ var _ = Describe("ContainerProvider", func() {
 			"http://proxy.com",
 			"https://proxy.com",
 			"http://noproxy.com",
+			"some-cert-path",
 			fakeClock,
 		)
 
@@ -138,6 +139,28 @@ var _ = Describe("ContainerProvider", func() {
 
 			It("creates container in garden", func() {
 				Expect(fakeGardenClient.CreateCallCount()).To(Equal(1))
+
+			})
+
+			It("creates the container with the specified handle", func() {
+				containerSpec := fakeGardenClient.CreateArgsForCall(0)
+				Expect(containerSpec.Handle).To(Equal("some-handle"))
+			})
+
+			It("creates the container with proxies configured in the env", func() {
+				containerSpec := fakeGardenClient.CreateArgsForCall(0)
+				Expect(containerSpec.Env).To(Equal([]string{
+					"http_proxy=http://proxy.com",
+					"https_proxy=https://proxy.com",
+					"no_proxy=http://noproxy.com",
+				}))
+			})
+
+			It("creates the container with the certificates mounted in", func() {
+				containerSpec := fakeGardenClient.CreateArgsForCall(0)
+				Expect(containerSpec.BindMounts).To(Equal([]garden.BindMount{
+					{SrcPath: "some-cert-path", DstPath: "/etc/ssl/certs", Mode: garden.BindMountModeRO},
+				}))
 			})
 
 			It("marks container as created", func() {

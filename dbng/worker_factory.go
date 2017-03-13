@@ -38,6 +38,7 @@ var workersQuery = psql.Select(`
 		w.http_proxy_url,
 		w.https_proxy_url,
 		w.no_proxy,
+		w.certificates_path,
 		w.active_containers,
 		w.resource_types,
 		w.platform,
@@ -105,6 +106,7 @@ func scanWorker(worker *worker, row scannable) error {
 		httpProxyURL  sql.NullString
 		httpsProxyURL sql.NullString
 		noProxy       sql.NullString
+		certPath      sql.NullString
 		resourceTypes []byte
 		platform      sql.NullString
 		tags          []byte
@@ -122,6 +124,7 @@ func scanWorker(worker *worker, row scannable) error {
 		&httpProxyURL,
 		&httpsProxyURL,
 		&noProxy,
+		&certPath,
 		&worker.activeContainers,
 		&resourceTypes,
 		&platform,
@@ -163,6 +166,10 @@ func scanWorker(worker *worker, row scannable) error {
 
 	if noProxy.Valid {
 		worker.noProxy = noProxy.String
+	}
+
+	if certPath.Valid {
+		worker.certificatesPath = certPath.String
 	}
 
 	if teamName.Valid {
@@ -335,6 +342,7 @@ func saveWorker(tx Tx, atcWorker atc.Worker, teamID *int, ttl time.Duration, con
 					"http_proxy_url",
 					"https_proxy_url",
 					"no_proxy",
+					"certificates_path",
 					"name",
 					"start_time",
 					"team_id",
@@ -351,6 +359,7 @@ func saveWorker(tx Tx, atcWorker atc.Worker, teamID *int, ttl time.Duration, con
 					atcWorker.HTTPProxyURL,
 					atcWorker.HTTPSProxyURL,
 					atcWorker.NoProxy,
+					atcWorker.CertificatesPath,
 					atcWorker.Name,
 					atcWorker.StartTime,
 					teamID,
@@ -381,6 +390,7 @@ func saveWorker(tx Tx, atcWorker atc.Worker, teamID *int, ttl time.Duration, con
 			Set("http_proxy_url", atcWorker.HTTPProxyURL).
 			Set("https_proxy_url", atcWorker.HTTPSProxyURL).
 			Set("no_proxy", atcWorker.NoProxy).
+			Set("certificates_path", atcWorker.CertificatesPath).
 			Set("name", atcWorker.Name).
 			Set("start_time", atcWorker.StartTime).
 			Set("state", string(workerState)).
@@ -407,6 +417,7 @@ func saveWorker(tx Tx, atcWorker atc.Worker, teamID *int, ttl time.Duration, con
 		httpProxyURL:     atcWorker.HTTPProxyURL,
 		httpsProxyURL:    atcWorker.HTTPSProxyURL,
 		noProxy:          atcWorker.NoProxy,
+		certificatesPath: atcWorker.CertificatesPath,
 		activeContainers: atcWorker.ActiveContainers,
 		resourceTypes:    atcWorker.ResourceTypes,
 		platform:         atcWorker.Platform,

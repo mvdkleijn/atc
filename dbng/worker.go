@@ -34,6 +34,7 @@ type Worker interface {
 	HTTPProxyURL() string
 	HTTPSProxyURL() string
 	NoProxy() string
+	CertificatesPath() string
 	ActiveContainers() int
 	ResourceTypes() []atc.WorkerResourceType
 	Platform() string
@@ -61,6 +62,7 @@ type worker struct {
 	httpProxyURL     string
 	httpsProxyURL    string
 	noProxy          string
+	certificatesPath string
 	activeContainers int
 	resourceTypes    []atc.WorkerResourceType
 	platform         string
@@ -78,6 +80,7 @@ func (worker *worker) BaggageclaimURL() *string                { return worker.b
 func (worker *worker) HTTPProxyURL() string                    { return worker.httpProxyURL }
 func (worker *worker) HTTPSProxyURL() string                   { return worker.httpsProxyURL }
 func (worker *worker) NoProxy() string                         { return worker.noProxy }
+func (worker *worker) CertificatesPath() string                { return worker.certificatesPath }
 func (worker *worker) ActiveContainers() int                   { return worker.activeContainers }
 func (worker *worker) ResourceTypes() []atc.WorkerResourceType { return worker.resourceTypes }
 func (worker *worker) Platform() string                        { return worker.platform }

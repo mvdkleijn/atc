@@ -25,6 +25,7 @@ var _ = Describe("Worker", func() {
 			HTTPProxyURL:     "some-http-proxy-url",
 			HTTPSProxyURL:    "some-https-proxy-url",
 			NoProxy:          "some-no-proxy",
+			CertificatesPath: "some-certificates-path",
 			ActiveContainers: 140,
 			ResourceTypes: []atc.WorkerResourceType{
 				{

@@ -73,6 +73,15 @@ type FakeWorker struct {
 	noProxyReturnsOnCall map[int]struct {
 		result1 string
 	}
+	CertificatesPathStub        func() string
+	certificatesPathMutex       sync.RWMutex
+	certificatesPathArgsForCall []struct{}
+	certificatesPathReturns     struct {
+		result1 string
+	}
+	certificatesPathReturnsOnCall map[int]struct {
+		result1 string
+	}
 	ActiveContainersStub        func() int
 	activeContainersMutex       sync.RWMutex
 	activeContainersArgsForCall []struct{}
@@ -472,6 +481,46 @@ func (fake *FakeWorker) NoProxyReturnsOnCall(i int, result1 string) {
 		})
 	}
 	fake.noProxyReturnsOnCall[i] = struct {
+		result1 string
+	}{result1}
+}
+
+func (fake *FakeWorker) CertificatesPath() string {
+	fake.certificatesPathMutex.Lock()
+	ret, specificReturn := fake.certificatesPathReturnsOnCall[len(fake.certificatesPathArgsForCall)]
+	fake.certificatesPathArgsForCall = append(fake.certificatesPathArgsForCall, struct{}{})
+	fake.recordInvocation("CertificatesPath", []interface{}{})
+	fake.certificatesPathMutex.Unlock()
+	if fake.CertificatesPathStub != nil {
+		return fake.CertificatesPathStub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fake.certificatesPathReturns.result1
+}
+
+func (fake *FakeWorker) CertificatesPathCallCount() int {
+	fake.certificatesPathMutex.RLock()
+	defer fake.certificatesPathMutex.RUnlock()
+	return len(fake.certificatesPathArgsForCall)
+}
+
+func (fake *FakeWorker) CertificatesPathReturns(result1 string) {
+	fake.CertificatesPathStub = nil
+	fake.certificatesPathReturns = struct {
+		result1 string
+	}{result1}
+}
+
+func (fake *FakeWorker) CertificatesPathReturnsOnCall(i int, result1 string) {
+	fake.CertificatesPathStub = nil
+	if fake.certificatesPathReturnsOnCall == nil {
+		fake.certificatesPathReturnsOnCall = make(map[int]struct {
+			result1 string
+		})
+	}
+	fake.certificatesPathReturnsOnCall[i] = struct {
 		result1 string
 	}{result1}
 }
@@ -1016,6 +1065,8 @@ func (fake *FakeWorker) Invocations() map[string][][]interface{} {
 	defer fake.hTTPSProxyURLMutex.RUnlock()
 	fake.noProxyMutex.RLock()
 	defer fake.noProxyMutex.RUnlock()
+	fake.certificatesPathMutex.RLock()
+	defer fake.certificatesPathMutex.RUnlock()
 	fake.activeContainersMutex.RLock()
 	defer fake.activeContainersMutex.RUnlock()
 	fake.resourceTypesMutex.RLock()

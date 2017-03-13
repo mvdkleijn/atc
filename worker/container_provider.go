@@ -37,9 +37,10 @@ type containerProviderFactory struct {
 
 	db GardenWorkerDB
 
-	httpProxyURL  string
-	httpsProxyURL string
-	noProxy       string
+	httpProxyURL     string
+	httpsProxyURL    string
+	noProxy          string
+	certificatesPath string
 
 	clock clock.Clock
 }
@@ -57,6 +58,7 @@ func NewContainerProviderFactory(
 	httpProxyURL string,
 	httpsProxyURL string,
 	noProxy string,
+	certificatesPath string,
 	clock clock.Clock,
 ) ContainerProviderFactory {
 	return &containerProviderFactory{
@@ -72,6 +74,7 @@ func NewContainerProviderFactory(
 		httpProxyURL:            httpProxyURL,
 		httpsProxyURL:           httpsProxyURL,
 		noProxy:                 noProxy,
+		certificatesPath:        certificatesPath,
 		clock:                   clock,
 	}
 }
@@ -92,6 +95,7 @@ func (f *containerProviderFactory) ContainerProviderFor(
 		httpProxyURL:            f.httpProxyURL,
 		httpsProxyURL:           f.httpsProxyURL,
 		noProxy:                 f.noProxy,
+		certificatesPath:        f.certificatesPath,
 		clock:                   f.clock,
 		worker:                  worker,
 	}
@@ -160,10 +164,11 @@ type containerProvider struct {
 	db       GardenWorkerDB
 	provider WorkerProvider
 
-	worker        Worker
-	httpProxyURL  string
-	httpsProxyURL string
-	noProxy       string
+	worker           Worker
+	httpProxyURL     string
+	httpsProxyURL    string
+	noProxy          string
+	certificatesPath string
 
 	clock clock.Clock
 }
@@ -605,7 +610,9 @@ func (p *containerProvider) createGardenContainer(
 		})
 	}
 
-	bindMounts := []garden.BindMount{}
+	bindMounts := []garden.BindMount{
+		{SrcPath: p.certificatesPath, DstPath: "/etc/ssl/certs", Mode: garden.BindMountModeRO},
+	}
 
 	volumeHandleMounts := map[string]string{}
 	for _, mount := range volumeMounts {

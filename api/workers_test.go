@@ -706,6 +706,7 @@ var _ = Describe("Workers API", func() {
 				"state": "running",
 				"addr": "",
 				"baggageclaim_url": "",
+				"credentials_path": "",
 				"active_containers": 2,
 				"resource_types": null,
 				"platform": "penguin",

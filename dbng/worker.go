@@ -33,6 +33,7 @@ type Worker struct {
 	NoProxy         string
 
 	ActiveContainers int
+	CertificatesPath string
 	ResourceTypes    []atc.WorkerResourceType
 	Platform         string
 	Tags             []string

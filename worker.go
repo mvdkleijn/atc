@@ -9,6 +9,8 @@ type Worker struct {
 	HTTPSProxyURL string `json:"https_proxy_url,omitempty"`
 	NoProxy       string `json:"no_proxy,omitempty"`
 
+	CertificatesPath string `json:"certificates_path"`
+
 	ActiveContainers int `json:"active_containers"`
 
 	ResourceTypes []WorkerResourceType `json:"resource_types"`

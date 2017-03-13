@@ -26,6 +26,7 @@ var _ = Describe("WorkerFactory", func() {
 			HTTPProxyURL:     "some-http-proxy-url",
 			HTTPSProxyURL:    "some-https-proxy-url",
 			NoProxy:          "some-no-proxy",
+			CertificatesPath: "some-certificate-path",
 			ActiveContainers: 140,
 			ResourceTypes: []atc.WorkerResourceType{
 				{
@@ -100,6 +101,7 @@ var _ = Describe("WorkerFactory", func() {
 				Expect(foundWorker.HTTPProxyURL).To(Equal("some-http-proxy-url"))
 				Expect(foundWorker.HTTPSProxyURL).To(Equal("some-https-proxy-url"))
 				Expect(foundWorker.NoProxy).To(Equal("some-no-proxy"))
+				Expect(foundWorker.CertificatesPath).To(Equal("some-certificate-path"))
 				Expect(foundWorker.ActiveContainers).To(Equal(140))
 				Expect(foundWorker.ResourceTypes).To(Equal([]atc.WorkerResourceType{
 					{
@@ -164,6 +166,7 @@ var _ = Describe("WorkerFactory", func() {
 						HTTPProxyURL:     "some-http-proxy-url",
 						HTTPSProxyURL:    "some-https-proxy-url",
 						NoProxy:          "some-no-proxy",
+						CertificatesPath: "some-certificate-path",
 						ActiveContainers: 140,
 						ResourceTypes: []atc.WorkerResourceType{
 							{
@@ -189,6 +192,7 @@ var _ = Describe("WorkerFactory", func() {
 						HTTPProxyURL:     "some-http-proxy-url",
 						HTTPSProxyURL:    "some-https-proxy-url",
 						NoProxy:          "some-no-proxy",
+						CertificatesPath: "some-certificate-path",
 						ActiveContainers: 140,
 						ResourceTypes: []atc.WorkerResourceType{
 							{

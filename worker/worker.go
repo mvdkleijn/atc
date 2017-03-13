@@ -95,6 +95,7 @@ type gardenWorker struct {
 	httpProxyURL     string
 	httpsProxyURL    string
 	noProxy          string
+	certificatesPath string
 }
 
 func NewGardenWorker(
@@ -117,6 +118,7 @@ func NewGardenWorker(
 	httpProxyURL string,
 	httpsProxyURL string,
 	noProxy string,
+	certificatesPath string,
 ) Worker {
 	return &gardenWorker{
 		gardenClient:       gardenClient,
@@ -138,6 +140,7 @@ func NewGardenWorker(
 		httpProxyURL:       httpProxyURL,
 		httpsProxyURL:      httpsProxyURL,
 		noProxy:            noProxy,
+		certificatesPath:   certificatesPath,
 	}
 }
 
@@ -401,6 +404,13 @@ func (worker *gardenWorker) CreateContainer(
 	}
 
 	bindMounts := []garden.BindMount{}
+
+	if metadata.IsForResource() {
+		bindMounts = []garden.BindMount{
+			{SrcPath: worker.certificatesPath, DstPath: "/etc/ssl/certs", Mode: garden.BindMountModeRO},
+		}
+	}
+
 	volumeHandles := []string{}
 	volumeHandleMounts := map[string]string{}
 	for _, mount := range volumeMounts {

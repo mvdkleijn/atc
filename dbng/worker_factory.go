@@ -47,25 +47,7 @@ func (f *workerFactory) GetWorker(name string) (*Worker, bool, error) {
 
 	defer tx.Rollback()
 
-	row := psql.Select(`
-		w.name,
-		w.addr,
-		w.state,
-		w.baggageclaim_url,
-		w.http_proxy_url,
-		w.https_proxy_url,
-		w.no_proxy,
-		w.active_containers,
-		w.resource_types,
-		w.platform,
-		w.tags,
-		w.team_id,
-		w.start_time,
-		t.name,
-		EXTRACT(epoch FROM w.expires - NOW())
-	`).
-		From("workers w").
-		LeftJoin("teams t ON w.team_id = t.id").
+	row := workersQuery.
 		Where(sq.Eq{"w.name": name}).
 		RunWith(tx).
 		QueryRow()
@@ -94,6 +76,7 @@ var workersQuery = psql.Select(`
 		w.http_proxy_url,
 		w.https_proxy_url,
 		w.no_proxy,
+		w.certificates_path,
 		w.active_containers,
 		w.resource_types,
 		w.platform,
@@ -158,6 +141,7 @@ func scanWorker(row scannable) (*Worker, error) {
 		httpProxyURL  sql.NullString
 		httpsProxyURL sql.NullString
 		noProxy       sql.NullString
+		certPath      sql.NullString
 
 		activeContainers int
 		resourceTypes    []byte
@@ -178,6 +162,7 @@ func scanWorker(row scannable) (*Worker, error) {
 		&httpProxyURL,
 		&httpsProxyURL,
 		&noProxy,
+		&certPath,
 		&activeContainers,
 		&resourceTypes,
 		&platform,
@@ -225,6 +210,10 @@ func scanWorker(row scannable) (*Worker, error) {
 
 	if noProxy.Valid {
 		worker.NoProxy = noProxy.String
+	}
+
+	if certPath.Valid {
+		worker.CertificatesPath = certPath.String
 	}
 
 	if teamName.Valid {
@@ -821,6 +810,7 @@ func saveWorker(tx Tx, worker atc.Worker, team *team, ttl time.Duration) (*Worke
 					"http_proxy_url",
 					"https_proxy_url",
 					"no_proxy",
+					"certificates_path",
 					"name",
 					"start_time",
 					"team_id",
@@ -837,6 +827,7 @@ func saveWorker(tx Tx, worker atc.Worker, team *team, ttl time.Duration) (*Worke
 					worker.HTTPProxyURL,
 					worker.HTTPSProxyURL,
 					worker.NoProxy,
+					worker.CertificatesPath,
 					worker.Name,
 					worker.StartTime,
 					teamID,
@@ -871,6 +862,7 @@ func saveWorker(tx Tx, worker atc.Worker, team *team, ttl time.Duration) (*Worke
 			Set("name", worker.Name).
 			Set("start_time", worker.StartTime).
 			Set("state", string(workerState)).
+			Set("certificates_path", worker.CertificatesPath).
 			Where(sq.Eq{
 				"name": worker.Name,
 			}).

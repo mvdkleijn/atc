@@ -177,5 +177,6 @@ func (provider *dbProvider) newGardenWorker(tikTok clock.Clock, savedWorker *dbn
 		savedWorker.HTTPProxyURL,
 		savedWorker.HTTPSProxyURL,
 		savedWorker.NoProxy,
+		savedWorker.CertificatesPath,
 	)
 }

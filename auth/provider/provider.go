@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/concourse/atc/db"
+	flags "github.com/jessevdk/go-flags"
 
 	"code.cloudfoundry.org/lager"
 
@@ -38,6 +39,7 @@ type Verifier interface {
 type TeamProvider interface {
 	ProviderConstructor(db.SavedTeam, string) (Provider, bool)
 	ProviderConfigured(db.Team) bool
+	AddAuthGroup(*flags.Parser)
 }
 
 var providers map[string]TeamProvider

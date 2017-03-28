@@ -10,6 +10,7 @@ type Team struct {
 	Name  string
 	Admin bool
 
+	// Auth map[string]AuthConfig
 	BasicAuth    *BasicAuth    `json:"basic_auth"`
 	GitHubAuth   *GitHubAuth   `json:"github_auth"`
 	UAAAuth      *UAAAuth      `json:"uaa_auth"`

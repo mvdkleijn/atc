@@ -56,7 +56,7 @@ import (
 
 	_ "github.com/concourse/atc/auth/genericoauth"
 	_ "github.com/concourse/atc/auth/github"
-	_ "github.com/concourse/atc/auth/uaa"
+	"github.com/concourse/atc/auth/provider"
 )
 
 type ATCCommand struct {
@@ -483,6 +483,12 @@ func (cmd *ATCCommand) validate() error {
 		)
 	}
 
+	for _, p := range provider.GetProviders() {
+		if
+	}
+
+	// Just loop through AuthConfig map to see if configured
+
 	if cmd.Authentication.GitHubAuth.IsConfigured() {
 		if cmd.ExternalURL.URL() == nil {
 			errs = multierror.Append(
@@ -702,6 +708,11 @@ func (cmd *ATCCommand) configureAuthForDefaultTeam(teamDBFactory db.TeamDBFactor
 	if err != nil {
 		return err
 	}
+
+	// Instead of checking if each auth provider is configured like it is right now, we will
+	// have a AuthConfig map (passed in from main.go) which we can loop through and instead of
+	// putting each flag auth struct into each db auth struct, we will just pass through the
+	// auth map to the Team struct
 
 	var gitHubAuth *db.GitHubAuth
 	if cmd.Authentication.GitHubAuth.IsConfigured() {

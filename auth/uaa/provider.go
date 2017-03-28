@@ -6,9 +6,12 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/concourse/atc"
 	"github.com/concourse/atc/auth/provider"
 	"github.com/concourse/atc/auth/verifier"
 	"github.com/concourse/atc/db"
+	"github.com/hashicorp/go-multierror"
+	flags "github.com/jessevdk/go-flags"
 	"golang.org/x/oauth2"
 )
 
@@ -27,7 +30,53 @@ func init() {
 	provider.Register(ProviderName, UAATeamProvider{})
 }
 
+type UAAAuthFlag struct {
+	ClientID     string       `long:"client-id"     description:"Application client ID for enabling UAA OAuth."`
+	ClientSecret string       `long:"client-secret" description:"Application client secret for enabling UAA OAuth."`
+	AuthURL      string       `long:"auth-url"      description:"UAA AuthURL endpoint."`
+	TokenURL     string       `long:"token-url"     description:"UAA TokenURL endpoint."`
+	CFSpaces     []string     `long:"cf-space"      description:"Space GUID for a CF space whose developers will have access."`
+	CFURL        string       `long:"cf-url"        description:"CF API endpoint."`
+	CFCACert     atc.PathFlag `long:"cf-ca-cert"    description:"Path to CF PEM-encoded CA certificate file."`
+}
+
+func (auth *UAAAuthFlag) IsConfigured() bool {
+	return auth.ClientID != "" ||
+		auth.ClientSecret != "" ||
+		len(auth.CFSpaces) > 0 ||
+		auth.AuthURL != "" ||
+		auth.TokenURL != "" ||
+		auth.CFURL != ""
+}
+
+func (auth *UAAAuthFlag) Validate() error {
+	var errs *multierror.Error
+	if auth.ClientID == "" || auth.ClientSecret == "" {
+		errs = multierror.Append(
+			errs,
+			errors.New("must specify --uaa-auth-client-id and --uaa-auth-client-secret to use UAA OAuth."),
+		)
+	}
+	if len(auth.CFSpaces) == 0 {
+		errs = multierror.Append(
+			errs,
+			errors.New("must specify --uaa-auth-cf-space to use UAA OAuth."),
+		)
+	}
+	if auth.AuthURL == "" || auth.TokenURL == "" || auth.CFURL == "" {
+		errs = multierror.Append(
+			errs,
+			errors.New("must specify --uaa-auth-auth-url, --uaa-auth-token-url and --uaa-auth-cf-url to use UAA OAuth."),
+		)
+	}
+	return errs.ErrorOrNil()
+}
+
 type UAATeamProvider struct{}
+
+func (UAATeamProvider) AddAuthGroup(parser *flags.Parser) {
+	parser.Group.AddGroup("UAA Auth", "UAA Authentication", UAAAuthFlag{})
+}
 
 func (UAATeamProvider) ProviderConfigured(team db.Team) bool {
 	return team.UAAAuth != nil

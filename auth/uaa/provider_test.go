@@ -5,31 +5,35 @@ import (
 	"encoding/pem"
 	"net/http"
 
+	"github.com/concourse/atc"
 	"github.com/concourse/atc/auth/provider"
 	"github.com/concourse/atc/auth/uaa"
-	"github.com/concourse/atc/db"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Provider", func() {
 	var (
-		team            db.SavedTeam
+		authConfig      *uaa.UAAAuthConfig
 		redirectURI     string
 		uaaProvider     provider.Provider
 		found           bool
 		uaaTeamProvider uaa.UAATeamProvider
+		sslCert         atc.PathFlag
 	)
+
+	BeforeEach(func() {
+		authConfig = nil
+	})
 
 	JustBeforeEach(func() {
 		uaaTeamProvider = uaa.UAATeamProvider{}
-		uaaProvider, found = uaaTeamProvider.ProviderConstructor(team, redirectURI)
+		uaaProvider, found = uaaTeamProvider.ProviderConstructor(authConfig, redirectURI)
 		Expect(found).To(BeTrue())
 	})
 
 	Describe("PreTokenClient", func() {
 		Context("when an ssl cert is configured", func() {
-			var sslCert string
 			BeforeEach(func() {
 				sslCert = `-----BEGIN CERTIFICATE-----
 MIICsjCCAhugAwIBAgIJAJgyGeIL1aiPMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
@@ -49,13 +53,8 @@ HCu8gfq+3WRUgddCQnYJUXtig2yAqmHf/WGR9yYYnfMUDKa85i0inolq1EnLvgVV
 K4iijxtW0XYe5R1Od6lWOEKZ6un9Ag==
 -----END CERTIFICATE-----
 	`
-				team = db.SavedTeam{
-					Team: db.Team{
-						Name: "some-team",
-						UAAAuth: &db.UAAAuth{
-							CFCACert: sslCert,
-						},
-					},
+				authConfig = &uaa.UAAAuthConfig{
+					CFCACert: sslCert,
 				}
 
 				redirectURI = "some-redirect-url"
@@ -91,12 +90,7 @@ K4iijxtW0XYe5R1Od6lWOEKZ6un9Ag==
 
 		Context("when no ssl cert is configured", func() {
 			BeforeEach(func() {
-				team = db.SavedTeam{
-					Team: db.Team{
-						Name:    "some-team",
-						UAAAuth: &db.UAAAuth{},
-					},
-				}
+				authConfig = &uaa.UAAAuthConfig{}
 				redirectURI = "some-redirect-url"
 			})
 
@@ -126,13 +120,9 @@ K4iijxtW0XYe5R1Od6lWOEKZ6un9Ag==
 
 		Context("when an invalid ssl cert is configured", func() {
 			BeforeEach(func() {
-				team = db.SavedTeam{
-					Team: db.Team{
-						Name: "some-team",
-						UAAAuth: &db.UAAAuth{
-							CFCACert: "some-invalid-cert",
-						},
-					},
+				sslCert = "some-invalid-cert"
+				authConfig = &uaa.UAAAuthConfig{
+					CFCACert: sslCert,
 				}
 				redirectURI = "some-redirect-url"
 			})

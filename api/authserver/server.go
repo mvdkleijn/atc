@@ -6,6 +6,7 @@ import (
 	"code.cloudfoundry.org/lager"
 	"github.com/concourse/atc/auth"
 	"github.com/concourse/atc/db"
+	"github.com/concourse/atc/dbng"
 )
 
 type Server struct {
@@ -15,6 +16,7 @@ type Server struct {
 	tokenGenerator  auth.TokenGenerator
 	providerFactory auth.ProviderFactory
 	teamDBFactory   db.TeamDBFactory
+	teamFactory     dbng.TeamFactory
 	expire          time.Duration
 }
 
@@ -25,6 +27,7 @@ func NewServer(
 	tokenGenerator auth.TokenGenerator,
 	providerFactory auth.ProviderFactory,
 	teamDBFactory db.TeamDBFactory,
+	teamFactory dbng.TeamFactory,
 	expire time.Duration,
 ) *Server {
 	return &Server{
@@ -34,6 +37,7 @@ func NewServer(
 		tokenGenerator:  tokenGenerator,
 		providerFactory: providerFactory,
 		teamDBFactory:   teamDBFactory,
+		teamFactory:     teamFactory,
 		expire:          expire,
 	}
 }

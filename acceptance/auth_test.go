@@ -175,7 +175,7 @@ var _ = Describe("Auth", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusTemporaryRedirect))
 		})
 
-		It("shows the option on the login page", func() {
+		FIt("shows the option on the login page", func() {
 			atcCommand = NewATCCommand(atcBin, 1, postgresRunner.DataSourceName(), []string{}, GENERIC_OAUTH_AUTH)
 			err := atcCommand.Start()
 			Expect(err).NotTo(HaveOccurred())

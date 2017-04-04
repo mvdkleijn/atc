@@ -90,6 +90,7 @@ func NewHandler(
 		tokenGenerator,
 		providerFactory,
 		teamDBFactory,
+		dbTeamFactory,
 		expire,
 	)
 
@@ -123,7 +124,7 @@ func NewHandler(
 
 	volumesServer := volumeserver.NewServer(logger, volumeFactory)
 
-	teamServer := teamserver.NewServer(logger, teamDBFactory, teamsDB)
+	teamServer := teamserver.NewServer(logger, dbTeamFactory, teamDBFactory, teamsDB)
 
 	infoServer := infoserver.NewServer(logger, version)
 

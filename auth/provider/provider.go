@@ -1,13 +1,16 @@
 package provider
 
 import (
+	"fmt"
 	"net/http"
 
-	"github.com/concourse/atc/db"
+	"github.com/concourse/atc"
+	"github.com/concourse/atc/dbng"
+	flags "github.com/jessevdk/go-flags"
 
 	"code.cloudfoundry.org/lager"
 
-	"fmt"
+	"encoding/json"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
@@ -34,10 +37,22 @@ type Verifier interface {
 	Verify(lager.Logger, *http.Client) (bool, error)
 }
 
-// If you can think of a better name, please change it
-type TeamProvider interface {
-	ProviderConstructor(db.SavedTeam, string) (Provider, bool)
-	ProviderConfigured(db.Team) bool
+//go:generate counterfeiter . AuthConfig
+
+type AuthConfig interface {
+	IsConfigured() bool
+	Validate() error
+	AuthMethod(oauthBaseURL string) atc.AuthMethod
+}
+
+type AuthConfigs map[string]AuthConfig
+
+//go:generate counterfeiter . TeamProvider
+
+type TeamProvider interface { // XXX rename to ProviderFactory
+	ProviderConstructor(AuthConfig, string) (Provider, bool)
+	AddAuthGroup(*flags.Parser) AuthConfig
+	UnmarshalConfig(*json.RawMessage) (AuthConfig, error)
 }
 
 var providers map[string]TeamProvider
@@ -46,17 +61,12 @@ func init() {
 	providers = make(map[string]TeamProvider)
 }
 
-func Register(providerName string, providerConstructor TeamProvider) error {
-	if _, exists := providers[providerName]; exists {
-		return fmt.Errorf("Provider already registered %s", providerName)
-	}
-
+func Register(providerName string, providerConstructor TeamProvider) {
 	providers[providerName] = providerConstructor
-	return nil
 }
 
 func NewProvider(
-	team db.SavedTeam,
+	team dbng.Team,
 	providerName string,
 	redirectURL string,
 ) (Provider, bool) {
@@ -64,8 +74,18 @@ func NewProvider(
 	if !found {
 		return nil, false
 	}
+	auth, found := team.Auth()[providerName]
+	if !found {
+		return nil, false
+	}
 
-	newProvider, ok := teamProvider.ProviderConstructor(team, redirectURL)
+	authConfig, err := teamProvider.UnmarshalConfig(auth)
+	if err != nil {
+		fmt.Println("not found")
+		return nil, false
+	}
+
+	newProvider, ok := teamProvider.ProviderConstructor(authConfig, redirectURL)
 	if !ok {
 		return nil, false
 	}

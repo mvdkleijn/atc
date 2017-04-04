@@ -4,9 +4,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"net/url"
@@ -54,13 +56,16 @@ import (
 
 	_ "github.com/concourse/atc/auth/genericoauth"
 	_ "github.com/concourse/atc/auth/github"
-	_ "github.com/concourse/atc/auth/uaa"
+	"github.com/concourse/atc/auth/provider"
 )
 
 type ATCCommand struct {
 	Logger LagerFlag
 
 	Authentication atc.AuthFlags `group:"Authentication"`
+
+	// populated by main.go as providers inject their flags dynamically
+	ProviderAuth map[string]provider.AuthConfig
 
 	BindIP   IPFlag `long:"bind-ip"   default:"0.0.0.0" description:"IP address on which to listen for web traffic."`
 	BindPort uint16 `long:"bind-port" default:"8080"    description:"Port on which to listen for HTTP traffic."`
@@ -219,7 +224,7 @@ func (cmd *ATCCommand) Runner(args []string) (ifrit.Runner, error) {
 		return nil, err
 	}
 
-	err = cmd.configureAuthForDefaultTeam(teamDBFactory)
+	err = cmd.configureAuthForDefaultTeam(dbTeamFactory)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +268,7 @@ func (cmd *ATCCommand) Runner(args []string) (ifrit.Runner, error) {
 	oauthHandler, err := auth.NewOAuthHandler(
 		logger,
 		providerFactory,
-		teamDBFactory,
+		dbTeamFactory,
 		signingKey,
 		cmd.AuthDuration,
 	)
@@ -497,38 +502,19 @@ func (cmd *ATCCommand) oauthBaseURL() string {
 	return baseURL
 }
 
-func (cmd *ATCCommand) authConfigured() bool {
-	return cmd.Authentication.BasicAuth.IsConfigured() || cmd.Authentication.GitHubAuth.IsConfigured() || cmd.Authentication.UAAAuth.IsConfigured() || cmd.Authentication.GenericOAuth.IsConfigured()
-}
-
 func (cmd *ATCCommand) validate() error {
 	var errs *multierror.Error
+	isConfigured := false
 
-	if !cmd.authConfigured() && !cmd.Authentication.NoAuth {
-		errs = multierror.Append(
-			errs,
-			errors.New("must configure basic auth, OAuth, UAAAuth, or provide no-auth flag"),
-		)
-	}
+	for _, p := range cmd.ProviderAuth {
+		if p.IsConfigured() {
+			err := p.Validate()
 
-	if cmd.Authentication.GitHubAuth.IsConfigured() {
-		if cmd.ExternalURL.URL() == nil {
-			errs = multierror.Append(
-				errs,
-				errors.New("must specify --external-url to use OAuth"),
-			)
-		}
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
 
-		err := cmd.Authentication.GitHubAuth.Validate()
-		if err != nil {
-			errs = multierror.Append(errs, err)
-		}
-	}
-
-	if cmd.Authentication.GenericOAuth.IsConfigured() {
-		err := cmd.Authentication.GenericOAuth.Validate()
-		if err != nil {
-			errs = multierror.Append(errs, err)
+			isConfigured = true
 		}
 	}
 
@@ -537,13 +523,14 @@ func (cmd *ATCCommand) validate() error {
 		if err != nil {
 			errs = multierror.Append(errs, err)
 		}
+		isConfigured = true
 	}
 
-	if cmd.Authentication.UAAAuth.IsConfigured() {
-		err := cmd.Authentication.UAAAuth.Validate()
-		if err != nil {
-			errs = multierror.Append(errs, err)
-		}
+	if !isConfigured && !cmd.Authentication.NoAuth {
+		errs = multierror.Append(
+			errs,
+			errors.New("must configure basic auth, OAuth, UAAAuth, or provide no-auth flag"),
+		)
 	}
 
 	tlsFlagCount := 0
@@ -729,89 +716,38 @@ func (cmd *ATCCommand) loadOrGenerateSigningKey() (*rsa.PrivateKey, error) {
 	return signingKey, nil
 }
 
-func (cmd *ATCCommand) configureAuthForDefaultTeam(teamDBFactory db.TeamDBFactory) error {
-	teamDB := teamDBFactory.GetTeamDB(atc.DefaultTeamName)
+func (cmd *ATCCommand) configureAuthForDefaultTeam(teamFactory dbng.TeamFactory) error {
+	team, found, err := teamFactory.FindTeam(atc.DefaultTeamName)
+	if !found {
+		return errors.New("default team not found")
+	}
 
-	var basicAuth *db.BasicAuth
+	var basicAuth *atc.BasicAuth
 	if cmd.Authentication.BasicAuth.IsConfigured() {
-		basicAuth = &db.BasicAuth{
+		basicAuth = &atc.BasicAuth{
 			BasicAuthUsername: cmd.Authentication.BasicAuth.Username,
 			BasicAuthPassword: cmd.Authentication.BasicAuth.Password,
 		}
 	}
-	_, err := teamDB.UpdateBasicAuth(basicAuth)
+	err = team.UpdateBasicAuth(basicAuth)
 	if err != nil {
 		return err
 	}
 
-	var gitHubAuth *db.GitHubAuth
-	if cmd.Authentication.GitHubAuth.IsConfigured() {
-		gitHubTeams := []db.GitHubTeam{}
-		for _, gitHubTeam := range cmd.Authentication.GitHubAuth.Teams {
-			gitHubTeams = append(gitHubTeams, db.GitHubTeam{
-				TeamName:         gitHubTeam.TeamName,
-				OrganizationName: gitHubTeam.OrganizationName,
-			})
-		}
-
-		gitHubAuth = &db.GitHubAuth{
-			ClientID:      cmd.Authentication.GitHubAuth.ClientID,
-			ClientSecret:  cmd.Authentication.GitHubAuth.ClientSecret,
-			Organizations: cmd.Authentication.GitHubAuth.Organizations,
-			Teams:         gitHubTeams,
-			Users:         cmd.Authentication.GitHubAuth.Users,
-			AuthURL:       cmd.Authentication.GitHubAuth.AuthURL,
-			TokenURL:      cmd.Authentication.GitHubAuth.TokenURL,
-			APIURL:        cmd.Authentication.GitHubAuth.APIURL,
-		}
-	}
-
-	_, err = teamDB.UpdateGitHubAuth(gitHubAuth)
-	if err != nil {
-		return err
-	}
-
-	var uaaAuth *db.UAAAuth
-	if cmd.Authentication.UAAAuth.IsConfigured() {
-		cfCACert := ""
-		if cmd.Authentication.UAAAuth.CFCACert != "" {
-			cfCACertFileContents, err := ioutil.ReadFile(string(cmd.Authentication.UAAAuth.CFCACert))
+	teamAuth := make(map[string]*json.RawMessage)
+	for name, config := range cmd.ProviderAuth {
+		if config.IsConfigured() {
+			data, err := json.Marshal(config)
 			if err != nil {
 				return err
 			}
-			cfCACert = string(cfCACertFileContents)
-		}
 
-		uaaAuth = &db.UAAAuth{
-			ClientID:     cmd.Authentication.UAAAuth.ClientID,
-			ClientSecret: cmd.Authentication.UAAAuth.ClientSecret,
-			CFSpaces:     cmd.Authentication.UAAAuth.CFSpaces,
-			AuthURL:      cmd.Authentication.UAAAuth.AuthURL,
-			TokenURL:     cmd.Authentication.UAAAuth.TokenURL,
-			CFURL:        cmd.Authentication.UAAAuth.CFURL,
-			CFCACert:     cfCACert,
+			teamAuth[name] = (*json.RawMessage)(&data)
 		}
 	}
 
-	_, err = teamDB.UpdateUAAAuth(uaaAuth)
-	if err != nil {
-		return err
-	}
-
-	var genericOAuth *db.GenericOAuth
-	if cmd.Authentication.GenericOAuth.IsConfigured() {
-		genericOAuth = &db.GenericOAuth{
-			AuthURL:       cmd.Authentication.GenericOAuth.AuthURL,
-			AuthURLParams: cmd.Authentication.GenericOAuth.AuthURLParams,
-			Scope:         cmd.Authentication.GenericOAuth.Scope,
-			TokenURL:      cmd.Authentication.GenericOAuth.TokenURL,
-			ClientID:      cmd.Authentication.GenericOAuth.ClientID,
-			ClientSecret:  cmd.Authentication.GenericOAuth.ClientSecret,
-			DisplayName:   cmd.Authentication.GenericOAuth.DisplayName,
-		}
-	}
-
-	_, err = teamDB.UpdateGenericOAuth(genericOAuth)
+	log.Println("PA", teamAuth, cmd.ProviderAuth)
+	err = team.UpdateProviderAuth(teamAuth)
 	if err != nil {
 		return err
 	}
@@ -894,7 +830,7 @@ func (cmd *ATCCommand) constructAPIHandler(
 		PublicKey: &signingKey.PublicKey,
 	}
 
-	getTokenValidator := auth.NewTeamAuthValidator(teamDBFactory, authValidator)
+	getTokenValidator := auth.NewTeamAuthValidator(dbTeamFactory, authValidator)
 
 	checkPipelineAccessHandlerFactory := auth.NewCheckPipelineAccessHandlerFactory(
 		pipelineDBFactory,
